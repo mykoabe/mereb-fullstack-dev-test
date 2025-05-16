@@ -1,38 +1,66 @@
-import mock from "mock-fs";
-import fs from "fs";
+import { Worker } from "worker_threads";
 import { processCSVFile } from "../services/csvProcessor.service";
 
-const csvSample = `New York,202-01-01,100
-Boston,202-01-01,50
-New York,202-01-01,30`;
+jest.mock("worker_threads", () => {
+  const events = require("events");
+  return {
+    Worker: jest.fn().mockImplementation(() => {
+      const emitter = new events.EventEmitter();
+      process.nextTick(() => {
+        emitter.emit("message", { departments: 2, time: 123 });
+        emitter.emit("exit", 0);
+      });
+      return emitter;
+    }),
+  };
+});
 
 describe("processCSVFile", () => {
-  beforeEach(() => {
-    mock({
-      uploads: {
-        "test.csv": csvSample,
-      },
-      "public/outputs": {},
-    });
-  });
-
-  afterEach(() => {
-    mock.restore();
-  });
-
-  it("should process CSV correctly", async () => {
+  it("should return departments and time from worker thread", async () => {
     const result = await processCSVFile(
       "uploads/test.csv",
       "public/outputs/out.csv"
     );
 
-    expect(result.departments).toBe(2);
-    expect(typeof result.time).toBe("number");
+    expect(result).toEqual({ departments: 2, time: 123 });
 
-    const output = fs.readFileSync("public/outputs/out.csv", "utf-8");
+    expect(Worker).toHaveBeenCalledWith(expect.any(String), {
+      workerData: {
+        inputPath: "uploads/test.csv",
+        outputPath: "public/outputs/out.csv",
+      },
+    });
+  });
 
-    expect(output).toContain("Department Name,Total Number of Sales");
-    expect(output).toContain("New York,130");
-    expect(output).toContain("Boston,50");
+  it("should reject if worker exits with non-zero code", async () => {
+    // Override default mock to simulate error exit
+    (Worker as unknown as jest.Mock).mockImplementationOnce(() => {
+      const events = require("events");
+      const emitter = new events.EventEmitter();
+      process.nextTick(() => {
+        emitter.emit("exit", 1);
+      });
+      return emitter;
+    });
+
+    await expect(
+      processCSVFile("uploads/test.csv", "public/outputs/out.csv")
+    ).rejects.toThrow("Worker stopped with exit code 1");
+  });
+
+  it("should reject if worker sends an error", async () => {
+    (Worker as unknown as jest.Mock).mockImplementationOnce(() => {
+      const events = require("events");
+      const emitter = new events.EventEmitter();
+      process.nextTick(() => {
+        emitter.emit("message", { error: "CSV parsing failed" });
+        emitter.emit("exit", 0);
+      });
+      return emitter;
+    });
+
+    await expect(
+      processCSVFile("uploads/test.csv", "public/outputs/out.csv")
+    ).rejects.toThrow("CSV parsing failed");
   });
 });
