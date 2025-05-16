@@ -3,7 +3,7 @@
 import type React from "react";
 import { useRef, useState } from "react";
 import { uploadCSV } from "@/lib/api";
-import ProgressBar from "./ProgressBar";
+import { ProgressBar } from "./ProgressBar";
 import ResultCard from "./ResultCard";
 import { ErrorAlert } from "./ui/ErrorAlert";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ const FileUpload = () => {
   } | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,8 +40,13 @@ const FileUpload = () => {
 
     setIsLoading(true);
     setError("");
+    setUploadProgress(0);
+
     try {
-      const response = await uploadCSV(selectedFile);
+      // Pass the progress callback to track upload progress
+      const response = await uploadCSV(selectedFile, (progress) => {
+        setUploadProgress(progress);
+      });
 
       if (!response.downloadUrl || !response.metrics) {
         throw new Error("Invalid response format");
@@ -183,7 +189,7 @@ const FileUpload = () => {
         </div>
       )}
 
-      {isLoading && <ProgressBar />}
+      {isLoading && <ProgressBar progress={uploadProgress} />}
       {result && <ResultCard {...result} />}
     </div>
   );
