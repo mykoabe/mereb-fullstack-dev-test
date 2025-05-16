@@ -22,6 +22,14 @@ The frontend accepts CSV file uploads and displays processing progress and resul
    npm install
    npm run dev
 ```
+### Environment Configuration
+Both the backend and frontend require .env files for proper configuration.
+Example files are provided at:
+
+- backend/.env.example
+- frontend/.env.example
+I have added them there for developement purpose only.
+
 ## How to test
 Backend tests use Jest with mock filesystem support.
 Run all tests using:
