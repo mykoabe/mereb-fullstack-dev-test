@@ -10,6 +10,9 @@ export const uploadCSV = async (file: File): Promise<ApiResponse> => {
       {
         method: "POST",
         body: formData,
+        headers: {
+          "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "",
+        },
       }
     );
 
